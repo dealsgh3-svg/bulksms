@@ -7,18 +7,17 @@ import {
   Send,
   Wallet,
   TrendingUp,
-  TrendingDown,
   Users,
   MessageSquare,
   ArrowRight,
   Clock,
   CheckCircle2,
   XCircle,
-  Loader2,
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { AnimatedCounter } from '@/components/animated-counter';
 
-const CHART_COLORS = ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981'];
+const CHART_COLORS = ['#006B3F', '#FCD116', '#CE1126'];
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -36,24 +35,23 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
-    // Simulate loading data
     const timer = setTimeout(() => {
       setStats({
         totalSms: 12450,
         delivered: 11805,
         failed: 245,
         pending: 400,
-        totalSpent: 249.00,
+        totalSpent: 622.50,
         apiCalls: 3420,
         contacts: 2850,
         groups: 12,
       });
       setRecentLogs([
-        { id: 1, recipient: '+2348012345678', message: 'Your order has been shipped...', status: 'DELIVERED', cost: '0.020', createdAt: '2 mins ago' },
-        { id: 2, recipient: '+2348098765432', message: 'Hello, welcome to our plat...', status: 'SENT', cost: '0.020', createdAt: '5 mins ago' },
-        { id: 3, recipient: '+2347051234567', message: 'Your OTP is 123456', status: 'DELIVERED', cost: '0.020', createdAt: '12 mins ago' },
-        { id: 4, recipient: '+2348023456789', message: 'Reminder: Your appointm...', status: 'PENDING', cost: '0.040', createdAt: '15 mins ago' },
-        { id: 5, recipient: '+2348167890123', message: 'Thank you for registering...', status: 'DELIVERED', cost: '0.020', createdAt: '30 mins ago' },
+        { id: 1, recipient: '+233241234567', message: 'Your order has been shipped...', status: 'DELIVERED', cost: '0.05', createdAt: '2 mins ago' },
+        { id: 2, recipient: '+233202345678', message: 'Hello, welcome to our plat...', status: 'SENT', cost: '0.05', createdAt: '5 mins ago' },
+        { id: 3, recipient: '+233261234567', message: 'Your payment of GH₵150...', status: 'DELIVERED', cost: '0.05', createdAt: '12 mins ago' },
+        { id: 4, recipient: '+233241112222', message: 'Reminder: Your appointm...', status: 'PENDING', cost: '0.10', createdAt: '15 mins ago' },
+        { id: 5, recipient: '+233208887777', message: 'Thank you for registering...', status: 'DELIVERED', cost: '0.05', createdAt: '30 mins ago' },
       ]);
       setChartData([
         { name: 'Mon', sms: 1200, api: 400 },
@@ -71,10 +69,10 @@ export default function DashboardPage() {
   }, []);
 
   const statusIcons = {
-    DELIVERED: <CheckCircle2 className="h-4 w-4 text-green-500" />,
-    SENT: <CheckCircle2 className="h-4 w-4 text-blue-500" />,
+    DELIVERED: <CheckCircle2 className="h-4 w-4" style={{ color: '#006B3F' }} />,
+    SENT: <CheckCircle2 className="h-4 w-4" style={{ color: '#006B3F' }} />,
     PENDING: <Clock className="h-4 w-4 text-yellow-500" />,
-    FAILED: <XCircle className="h-4 w-4 text-red-500" />,
+    FAILED: <XCircle className="h-4 w-4" style={{ color: '#CE1126' }} />,
   };
 
   const pieData = [
@@ -104,7 +102,11 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back! Here&apos;s what&apos;s happening with your SMS campaigns.</p>
         </div>
-        <Link href="/dashboard/sms" className="btn btn-primary">
+        <Link 
+          href="/dashboard/sms" 
+          className="btn text-white"
+          style={{ backgroundColor: '#006B3F' }}
+        >
           <Send className="h-4 w-4" />
           Send SMS
         </Link>
@@ -112,85 +114,51 @@ export default function DashboardPage() {
 
       {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="rounded-xl border bg-card p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Send className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-green-600">
-              <TrendingUp className="h-4 w-4" />
-              +12%
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold">{stats.totalSms.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Total SMS Sent</div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="rounded-xl border bg-card p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-lg bg-green-500/10">
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-green-600">
-              <TrendingUp className="h-4 w-4" />
-              +8%
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold">{((stats.delivered / stats.totalSms) * 100).toFixed(1)}%</div>
-            <div className="text-sm text-muted-foreground">Delivery Rate</div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="rounded-xl border bg-card p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-lg bg-secondary/10">
-              <Wallet className="h-5 w-5 text-secondary" />
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold">${stats.totalSpent.toFixed(2)}</div>
-            <div className="text-sm text-muted-foreground">Total Spent</div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="rounded-xl border bg-card p-6"
-        >
-          <div className="flex items-center justify-between">
-            <div className="p-2 rounded-lg bg-accent/10">
-              <Users className="h-5 w-5 text-accent" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-green-600">
-              <TrendingUp className="h-4 w-4" />
-              +5%
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="text-3xl font-bold">{stats.contacts.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Total Contacts</div>
-          </div>
-        </motion.div>
+        {[
+          { icon: Send, label: 'Total SMS Sent', value: stats.totalSms, bg: '#006B3F20', color: '#006B3F', trend: '+12%' },
+          { icon: CheckCircle2, label: 'Delivery Rate', value: (stats.delivered / stats.totalSms) * 100, suffix: '%', decimals: 1, bg: '#006B3F20', color: '#006B3F', trend: '+8%' },
+          { icon: null, label: 'Total Spent', value: stats.totalSpent, prefix: 'GH₵', decimals: 2, bg: '#FCD11630', color: '#000', isCedi: true },
+          { icon: Users, label: 'Total Contacts', value: stats.contacts, bg: '#006B3F20', color: '#006B3F', trend: '+5%' },
+        ].map((card, i) => {
+          const Icon = card.icon;
+          return (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 * (i + 1) }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              className="rounded-xl border bg-card p-6 hover:shadow-lg transition-shadow cursor-default"
+            >
+              <div className="flex items-center justify-between">
+                <div className="p-2 rounded-lg" style={{ backgroundColor: card.bg }}>
+                  {card.isCedi ? (
+                    <span className="text-lg font-bold px-0.5" style={{ color: card.color }}>GH₵</span>
+                  ) : Icon ? (
+                    <Icon className="h-5 w-5" style={{ color: card.color }} />
+                  ) : null}
+                </div>
+                {card.trend && (
+                  <div className="flex items-center gap-1 text-sm" style={{ color: '#006B3F' }}>
+                    <TrendingUp className="h-4 w-4" />
+                    {card.trend}
+                  </div>
+                )}
+              </div>
+              <div className="mt-4">
+                <div className="text-3xl font-bold">
+                  <AnimatedCounter
+                    value={card.value}
+                    prefix={card.prefix || ''}
+                    suffix={card.suffix || ''}
+                    decimals={card.decimals || 0}
+                  />
+                </div>
+                <div className="text-sm text-muted-foreground">{card.label}</div>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Charts Row */}
@@ -206,11 +174,11 @@ export default function DashboardPage() {
             <h3 className="font-semibold">SMS Volume (Last 7 Days)</h3>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-primary" />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#006B3F' }} />
                 <span>Web</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded-full bg-secondary" />
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#FCD116' }} />
                 <span>API</span>
               </div>
             </div>
@@ -220,20 +188,20 @@ export default function DashboardPage() {
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorSms" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366F1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#006B3F" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#006B3F" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="colorApi" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#FCD116" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#FCD116" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" className="text-xs" />
                 <YAxis className="text-xs" />
                 <Tooltip />
-                <Area type="monotone" dataKey="sms" stroke="#6366F1" fillOpacity={1} fill="url(#colorSms)" />
-                <Area type="monotone" dataKey="api" stroke="#8B5CF6" fillOpacity={1} fill="url(#colorApi)" />
+                <Area type="monotone" dataKey="sms" stroke="#006B3F" fillOpacity={1} fill="url(#colorSms)" />
+                <Area type="monotone" dataKey="api" stroke="#FCD116" fillOpacity={1} fill="url(#colorApi)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -292,7 +260,7 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between p-6 border-b">
             <h3 className="font-semibold">Recent Messages</h3>
-            <Link href="/dashboard/analytics" className="text-sm text-primary hover:underline">
+            <Link href="/dashboard/analytics" className="text-sm hover:underline" style={{ color: '#006B3F' }}>
               View all
             </Link>
           </div>
@@ -309,7 +277,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-medium">${log.cost}</div>
+                  <div className="text-sm font-medium">GH₵{log.cost}</div>
                   <div className="text-xs text-muted-foreground">{log.createdAt}</div>
                 </div>
               </div>
@@ -328,58 +296,70 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <Link
               href="/dashboard/sms"
-              className="flex items-center gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
+              className="group flex items-center gap-4 p-4 rounded-lg border hover:bg-accent hover:shadow-md transition-all"
             >
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Send className="h-5 w-5 text-primary" />
+              <div 
+                className="p-2 rounded-lg"
+                style={{ backgroundColor: '#006B3F20' }}
+              >
+                <Send className="h-5 w-5" style={{ color: '#006B3F' }} />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Send Quick SMS</div>
                 <div className="text-sm text-muted-foreground">Send a single message</div>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
             </Link>
 
             <Link
               href="/dashboard/sms/bulk"
-              className="flex items-center gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
+              className="group flex items-center gap-4 p-4 rounded-lg border hover:bg-accent hover:shadow-md transition-all"
             >
-              <div className="p-2 rounded-lg bg-secondary/10">
-                <MessageSquare className="h-5 w-5 text-secondary" />
+              <div 
+                className="p-2 rounded-lg"
+                style={{ backgroundColor: '#FCD11630' }}
+              >
+                <MessageSquare className="h-5 w-5" style={{ color: '#000' }} />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Bulk SMS</div>
                 <div className="text-sm text-muted-foreground">Upload CSV for mass sending</div>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
             </Link>
 
             <Link
               href="/dashboard/contacts"
-              className="flex items-center gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
+              className="group flex items-center gap-4 p-4 rounded-lg border hover:bg-accent hover:shadow-md transition-all"
             >
-              <div className="p-2 rounded-lg bg-accent/10">
-                <Users className="h-5 w-5 text-accent" />
+              <div 
+                className="p-2 rounded-lg"
+                style={{ backgroundColor: '#006B3F20' }}
+              >
+                <Users className="h-5 w-5" style={{ color: '#006B3F' }} />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Import Contacts</div>
                 <div className="text-sm text-muted-foreground">Add new contacts to your list</div>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
             </Link>
 
             <Link
               href="/dashboard/wallet"
-              className="flex items-center gap-4 p-4 rounded-lg border hover:bg-accent transition-colors"
+              className="group flex items-center gap-4 p-4 rounded-lg border hover:bg-accent hover:shadow-md transition-all"
             >
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Wallet className="h-5 w-5 text-green-500" />
+              <div 
+                className="p-2 rounded-lg"
+                style={{ backgroundColor: '#FCD11630' }}
+              >
+                <Wallet className="h-5 w-5" style={{ color: '#000' }} />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Top Up Wallet</div>
                 <div className="text-sm text-muted-foreground">Add more SMS credits</div>
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground" />
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
         </motion.div>

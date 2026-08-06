@@ -23,8 +23,9 @@ interface PaymentMethod {
 }
 
 const paymentMethods: PaymentMethod[] = [
-  { id: 'KORA', name: 'Kora Pay', logo: '/kora.svg', fee: 0 },
-  { id: 'PAYSTACK', name: 'Paystack', logo: '/paystack.svg', fee: 0 },
+  { id: 'MOMO', name: 'MTN MoMo', logo: '/momo.svg', fee: 0 },
+  { id: 'TELECEL_CASH', name: 'Telecel Cash', logo: '/telecel.svg', fee: 0 },
+  { id: 'BANK', name: 'Bank Transfer', logo: '/bank.svg', fee: 0 },
 ];
 
 export default function WalletPage() {
@@ -32,7 +33,7 @@ export default function WalletPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [depositAmount, setDepositAmount] = useState('');
-  const [selectedGateway, setSelectedGateway] = useState('KORA');
+  const [selectedMethod, setSelectedMethod] = useState('MOMO');
   const [isDepositing, setIsDepositing] = useState(false);
   const [depositResult, setDepositResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
@@ -65,8 +66,8 @@ export default function WalletPage() {
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount < 1) {
-      setDepositResult({ success: false, error: 'Minimum deposit is $1' });
+    if (isNaN(amount) || amount < 5) {
+      setDepositResult({ success: false, error: 'Minimum deposit is GH₵5' });
       return;
     }
 
@@ -79,14 +80,13 @@ export default function WalletPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount,
-          gateway: selectedGateway,
+          method: selectedMethod,
         }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Redirect to payment page
         window.location.href = data.paymentUrl;
       } else {
         setDepositResult({
@@ -104,11 +104,11 @@ export default function WalletPage() {
     }
   };
 
-  const quickAmounts = [10, 25, 50, 100, 250, 500];
+  const quickAmounts = [10, 20, 50, 100, 200, 500];
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-GH', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -118,7 +118,7 @@ export default function WalletPage() {
   };
 
   const reasonLabels: Record<string, string> = {
-    DEPOSIT: 'Wallet Deposit',
+    DEPOSIT: 'Wallet Top-up',
     SMS_PURCHASE: 'SMS Purchase',
     REFUND: 'Refund',
     ADMIN_CREDIT: 'Admin Credit',
@@ -150,27 +150,28 @@ export default function WalletPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-gradient-to-br from-primary to-secondary p-6 text-primary-foreground"
+          className="rounded-2xl p-6 text-white"
+          style={{ background: 'linear-gradient(135deg, #006B3F 0%, #004d2e 100%)' }}
         >
           <div className="flex items-center gap-3 mb-6">
             <Wallet className="h-8 w-8" />
             <div>
               <div className="text-sm opacity-80">Available Balance</div>
-              <div className="text-4xl font-bold">${parseFloat(balance).toFixed(2)}</div>
+              <div className="text-4xl font-bold">GH₵{parseFloat(balance).toFixed(2)}</div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">{transactions.filter(t => t.type === 'DEBIT').length}</div>
               <div className="text-xs opacity-80">SMS Sent</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">{transactions.filter(t => t.type === 'CREDIT').length}</div>
-              <div className="text-xs opacity-80">Deposits</div>
+              <div className="text-xs opacity-80">Top-ups</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">
-                ${transactions.filter(t => t.type === 'CREDIT').reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(2)}
+                GH₵{transactions.filter(t => t.type === 'DEBIT').reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(2)}
               </div>
               <div className="text-xs opacity-80">Total Spent</div>
             </div>
@@ -185,7 +186,7 @@ export default function WalletPage() {
           className="rounded-xl border bg-card p-6"
         >
           <div className="flex items-center gap-2 mb-6">
-            <CreditCard className="h-5 w-5 text-primary" />
+            <CreditCard className="h-5 w-5" style={{ color: '#006B3F' }} />
             <h2 className="font-semibold">Top Up Wallet</h2>
           </div>
 
@@ -199,7 +200,7 @@ export default function WalletPage() {
 
           {/* Quick Amounts */}
           <div className="mb-4">
-            <label className="text-sm font-medium mb-2 block">Quick Amount</label>
+            <label className="text-sm font-medium mb-2 block">Quick Amount (GH₵)</label>
             <div className="grid grid-cols-3 gap-2">
               {quickAmounts.map((amt) => (
                 <button
@@ -207,11 +208,11 @@ export default function WalletPage() {
                   onClick={() => setDepositAmount(amt.toString())}
                   className={`p-3 rounded-lg border text-center font-medium transition-colors ${
                     depositAmount === amt.toString()
-                      ? 'border-primary bg-primary/10 text-primary'
+                      ? 'border-green-600 bg-green-50 text-green-700'
                       : 'border-input hover:bg-accent'
                   }`}
                 >
-                  ${amt}
+                  GH₵{amt}
                 </button>
               ))}
             </div>
@@ -221,20 +222,20 @@ export default function WalletPage() {
           <div className="mb-4">
             <label className="text-sm font-medium mb-2 block">Custom Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">GH₵</span>
               <input
                 type="number"
-                min="1"
+                min="5"
                 max="10000"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 placeholder="Enter amount"
-                className="input w-full pl-8"
+                className="input w-full pl-12"
               />
             </div>
           </div>
 
-          {/* Payment Gateway */}
+          {/* Payment Method */}
           <div className="mb-6">
             <label className="text-sm font-medium mb-2 block">Payment Method</label>
             <div className="space-y-2">
@@ -242,28 +243,29 @@ export default function WalletPage() {
                 <label
                   key={method.id}
                   className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedGateway === method.id ? 'border-primary bg-primary/5' : 'hover:bg-accent'
+                    selectedMethod === method.id
+                      ? 'border-green-600 bg-green-50'
+                      : 'hover:bg-accent'
                   }`}
                 >
                   <input
                     type="radio"
-                    name="gateway"
+                    name="method"
                     value={method.id}
-                    checked={selectedGateway === method.id}
-                    onChange={() => setSelectedGateway(method.id)}
+                    checked={selectedMethod === method.id}
+                    onChange={() => setSelectedMethod(method.id)}
                     className="sr-only"
                   />
                   <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                    selectedGateway === method.id ? 'border-primary' : 'border-muted'
+                    selectedMethod === method.id
+                      ? 'border-green-600'
+                      : 'border-muted'
                   }`}>
-                    {selectedGateway === method.id && (
-                      <div className="h-2 w-2 rounded-full bg-primary" />
+                    {selectedMethod === method.id && (
+                      <div className="h-2 w-2 rounded-full bg-green-600" />
                     )}
                   </div>
                   <span className="font-medium">{method.name}</span>
-                  {method.fee > 0 && (
-                    <span className="text-xs text-muted-foreground">({method.fee}% fee)</span>
-                  )}
                 </label>
               ))}
             </div>
@@ -272,7 +274,8 @@ export default function WalletPage() {
           <button
             onClick={handleDeposit}
             disabled={!depositAmount || isDepositing}
-            className="btn btn-primary w-full h-11"
+            className="btn w-full h-11 text-white"
+            style={{ backgroundColor: '#006B3F' }}
           >
             {isDepositing ? (
               <>
@@ -282,7 +285,7 @@ export default function WalletPage() {
             ) : (
               <>
                 <CreditCard className="h-4 w-4" />
-                Deposit ${depositAmount || '0'}
+                Deposit GH₵{depositAmount || '0'}
               </>
             )}
           </button>
@@ -330,10 +333,10 @@ export default function WalletPage() {
                   <div className={`font-semibold ${
                     tx.type === 'CREDIT' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {tx.type === 'CREDIT' ? '+' : '-'}${parseFloat(tx.amount).toFixed(2)}
+                    {tx.type === 'CREDIT' ? '+' : '-'}GH₵{parseFloat(tx.amount).toFixed(2)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Bal: ${parseFloat(tx.balanceAfter).toFixed(2)}
+                    Bal: GH₵{parseFloat(tx.balanceAfter).toFixed(2)}
                   </div>
                 </div>
               </div>

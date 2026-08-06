@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Clock, AlertCircle, CheckCircle2, Loader2, User } from 'lucide-react';
+import { Send, AlertCircle, CheckCircle2, Loader2, User } from 'lucide-react';
 import Link from 'next/link';
 
 interface SmsState {
@@ -31,17 +31,15 @@ export default function QuickSmsPage() {
   const [recentContacts, setRecentContacts] = useState<any[]>([]);
 
   useEffect(() => {
-    // Fetch balance
     fetch('/api/wallet/balance')
       .then((res) => res.json())
       .then((data) => setBalance(data.balance || '0'))
       .catch(() => setBalance('0'));
 
-    // Fetch recent contacts
     setRecentContacts([
-      { phone: '+2348012345678', name: 'John Doe' },
-      { phone: '+2348098765432', name: 'Jane Smith' },
-      { phone: '+2347051234567', name: 'Bob Wilson' },
+      { phone: '+233241234567', name: 'Kwame Asante' },
+      { phone: '+233202345678', name: 'Ama Mensah' },
+      { phone: '+233261234567', name: 'Kofi Addo' },
     ]);
   }, []);
 
@@ -52,12 +50,12 @@ export default function QuickSmsPage() {
     const pages = Math.ceil(message.length / charsPerPage) || 1;
     
     const rates: Record<string, number> = {
-      USER: 0.02,
-      AGENT: 0.015,
-      DEVELOPER: 0.012,
-      ADMIN: 0.01,
+      USER: 0.05,
+      AGENT: 0.04,
+      DEVELOPER: 0.035,
+      ADMIN: 0.03,
     };
-    const rate = rates[role] || 0.02;
+    const rate = rates[role] || 0.05;
     const totalCost = pages * rate;
 
     return { pages, charsPerPage, isUnicode, totalCost, rate };
@@ -148,14 +146,14 @@ export default function QuickSmsPage() {
                   type="tel"
                   value={formData.recipient}
                   onChange={(e) => setFormData({ ...formData, recipient: e.target.value })}
-                  placeholder="+2348012345678"
+                  placeholder="+233241234567"
                   className="input w-full pl-10"
                   required
                 />
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Include country code (e.g., +234 for Nigeria)
+                Use Ghana format: +233XXXXXXXXX or 0XXXXXXXXX
               </p>
             </div>
 
@@ -212,7 +210,8 @@ export default function QuickSmsPage() {
               <button
                 type="submit"
                 disabled={!canSend || isLoading}
-                className="btn btn-primary h-11 px-8"
+                className="btn h-11 px-8 text-white"
+                style={{ backgroundColor: '#006B3F' }}
               >
                 {isLoading ? (
                   <>
@@ -228,7 +227,7 @@ export default function QuickSmsPage() {
               </button>
 
               {costPreview.totalCost > parseFloat(balance) && (
-                <Link href="/dashboard/wallet" className="text-sm text-primary hover:underline">
+                <Link href="/dashboard/wallet" className="text-sm hover:underline" style={{ color: '#006B3F' }}>
                   Insufficient balance - Top up →
                 </Link>
               )}
@@ -248,7 +247,7 @@ export default function QuickSmsPage() {
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Rate per page</span>
-                <span>${costPreview.rate.toFixed(3)}</span>
+                <span>GH₵{costPreview.rate.toFixed(3)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Pages</span>
@@ -260,7 +259,7 @@ export default function QuickSmsPage() {
               </div>
               <div className="border-t pt-3 flex justify-between font-semibold">
                 <span>Total Cost</span>
-                <span className="text-primary">${costPreview.totalCost.toFixed(3)}</span>
+                <span style={{ color: '#006B3F' }}>GH₵{costPreview.totalCost.toFixed(3)}</span>
               </div>
             </div>
           </motion.div>
@@ -280,7 +279,10 @@ export default function QuickSmsPage() {
                   onClick={() => setFormData({ ...formData, recipient: contact.phone })}
                   className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-accent text-left"
                 >
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-medium">
+                  <div 
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-sm font-medium"
+                    style={{ backgroundColor: '#FCD11630', color: '#000' }}
+                  >
                     {contact.name.charAt(0)}
                   </div>
                   <div>
@@ -290,7 +292,7 @@ export default function QuickSmsPage() {
                 </button>
               ))}
             </div>
-            <Link href="/dashboard/contacts" className="block mt-4 text-sm text-primary hover:underline">
+            <Link href="/dashboard/contacts" className="block mt-4 text-sm hover:underline" style={{ color: '#006B3F' }}>
               View all contacts →
             </Link>
           </motion.div>
@@ -300,7 +302,8 @@ export default function QuickSmsPage() {
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-            className="rounded-xl border bg-muted/50 p-6"
+            className="rounded-xl border p-6"
+            style={{ backgroundColor: '#FCD11615', borderColor: '#FCD11640' }}
           >
             <h3 className="font-semibold mb-2">Tips</h3>
             <ul className="text-sm text-muted-foreground space-y-2">

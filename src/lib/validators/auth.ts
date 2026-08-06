@@ -6,6 +6,7 @@ export const loginSchema = z.object({
   rememberMe: z.boolean().optional(),
 });
 
+// Server-side schema (no confirmPassword - form validates that client-side)
 export const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string()
@@ -13,11 +14,15 @@ export const registerSchema = z.object({
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
-  confirmPassword: z.string(),
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   whatsappNumber: z.string()
     .min(10, 'Invalid phone number')
     .regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number format'),
+});
+
+// Client-side schema (includes confirmPassword validation)
+export const registerFormSchema = registerSchema.extend({
+  confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],
