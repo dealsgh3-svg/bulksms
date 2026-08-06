@@ -3,10 +3,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "drizzle-kit push && next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -48,10 +49,5 @@
     "postcss": "8.5.8",
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3"
-  },
-  "scripts": {
-  "dev": "next dev",
-  "build": "drizzle-kit push && next build",
-  "start": "next start",
-  "db:push": "drizzle-kit push"
+  }
 }
