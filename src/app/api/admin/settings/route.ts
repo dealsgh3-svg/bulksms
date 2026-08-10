@@ -8,13 +8,16 @@ import { updateSettingsSchema } from '@/lib/validators/payment';
 import { z } from 'zod';
 
 // Extended schema for the admin settings form, including gateway keys.
+// All key fields can be null (DB stores NULL when empty) or empty string.
+const optionalKeyStr = z.string().optional().nullable().transform((v) => v ?? undefined);
+
 const adminSettingsSchema = updateSettingsSchema.extend({
-  koraPublicKey: z.string().optional(),
-  koraSecretKey: z.string().optional(),
-  koraWebhookSecret: z.string().optional(),
-  paystackPublicKey: z.string().optional(),
-  paystackSecretKey: z.string().optional(),
-  paystackWebhookSecret: z.string().optional(),
+  koraPublicKey: optionalKeyStr,
+  koraSecretKey: optionalKeyStr,
+  koraWebhookSecret: optionalKeyStr,
+  paystackPublicKey: optionalKeyStr,
+  paystackSecretKey: optionalKeyStr,
+  paystackWebhookSecret: optionalKeyStr,
 });
 
 export async function GET() {

@@ -37,14 +37,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemo = (type: 'demo' | 'admin') => {
-    if (type === 'demo') {
-      setFormData({ email: 'demo@textflowpro.gh', password: 'Demo1234', rememberMe: false });
-    } else {
-      setFormData({ email: 'admin@textflowpro.gh', password: 'Admin1234', rememberMe: false });
-    }
-  };
-
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Form */}
@@ -89,27 +81,6 @@ export default function LoginPage() {
               {error}
             </motion.div>
           )}
-
-          {/* Demo credentials quick fill */}
-          <div className="mb-6 p-4 rounded-lg border bg-muted/40">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Try a demo account:</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => fillDemo('demo')}
-                className="flex-1 text-xs py-2 px-3 rounded-lg border bg-card hover:bg-accent transition-colors"
-              >
-                👤 Demo User
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('admin')}
-                className="flex-1 text-xs py-2 px-3 rounded-lg border bg-card hover:bg-accent transition-colors"
-              >
-                🛡️ Admin
-              </button>
-            </div>
-          </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
