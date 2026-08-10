@@ -143,13 +143,41 @@ All SMS APIs expect E.164 format (`+233XXXXXXXXX`).
 
 ---
 
-## 💳 Payment Methods (Ghana)
+## 💳 Payment Gateways (Kora Pay & Paystack)
 
-Users can top up wallets using:
+Wallet top-ups are processed through **real payment gateway integrations** — Kora Pay (default) and
+Paystack. Both support Ghanaian Mobile Money (MTN, Telecel, AT), cards, and bank transfer on their
+hosted checkout pages, so end users effectively pay however they prefer.
 
-1. **MTN Mobile Money** - Most popular, instant
-2. **Telecel Cash** - Instant mobile money
-3. **Bank Transfer** - 1-2 business days
+### How it works
+
+1. **Admin configures gateways** in `/admin/settings → Payment Gateways`:
+   - Choose the **active gateway** (Kora Pay or Paystack) — only this one is offered to users.
+   - Enter the **Public Key**, **Secret Key**, and optional **Webhook Signing Secret** for each gateway.
+   - Secret keys are **encrypted at rest** (AES-256-GCM) using `ENCRYPTION_KEY` and only ever shown
+     masked (e.g. `sk_t••••••••t123`) after saving.
+2. **User deposits** from `/dashboard/wallet`:
+   - The Wallet page automatically shows whichever gateway the admin activated, with a live
+     "Configured" / "Needs API keys" indicator.
+   - Clicking **Pay** calls `POST /api/wallet/deposit`, which creates a `PENDING` payment record and
+     initializes a real checkout session with the active gateway's API, then redirects the user to the
+     gateway's hosted checkout page.
+3. **Confirming payment** — two independent, idempotent mechanisms guarantee the wallet gets credited exactly once:
+   - **Webhook** (`POST /api/webhooks/kora` / `POST /api/webhooks/paystack`) — the gateway calls this
+     server-to-server when the charge completes. Signatures are verified (`x-korapay-signature` HMAC-SHA256,
+     `x-paystack-signature` HMAC-SHA512) before any wallet mutation happens.
+   - **Callback page** (`/dashboard/wallet/callback`) — after the user is redirected back, this page polls
+     `GET /api/wallet/verify?reference=...`, which independently asks the gateway for the transaction status
+     and credits the wallet if the webhook hasn't arrived yet. Both paths use the same `creditWallet()`
+     service and are deduplicated by the payment `reference`, so a webhook + callback firing for the same
+     payment can never double-credit the wallet.
+
+### Switching gateways
+
+Only the gateway selected as **Active Payment Gateway** in the admin panel is used for new deposits —
+switching the radio button in `/admin/settings` immediately routes all subsequent `POST /api/wallet/deposit`
+calls to that gateway's API. If the selected gateway has no secret key configured yet, deposits fail fast
+with a clear "Ask an admin to add API keys" error instead of silently breaking.
 
 ### No Subscriptions
 
@@ -160,6 +188,24 @@ Unlike international competitors, TextFlow Pro is **strictly pay-as-you-go**:
 - ✅ Pay only for SMS you actually send
 - ✅ Top up when you need to
 - ✅ Wallet balance never expires
+
+---
+
+## 🔧 Admin: Configuring Payment Gateways
+
+1. Log in with an **ADMIN** account and go to **Admin Panel → Settings → Payment Gateways**.
+2. Pick **Kora Pay** or **Paystack** as the *Active Payment Gateway*.
+3. Paste in the **Public Key** and **Secret Key** from your Kora or Paystack merchant dashboard.
+   - Kora: [developers.korapay.com](https://developers.korapay.com/docs) → Settings → API Keys & Webhooks
+   - Paystack: [dashboard.paystack.com](https://dashboard.paystack.com/#/settings/developer) → Settings → API Keys & Webhooks
+4. (Optional) Add the gateway's webhook URL to your merchant dashboard so payments confirm instantly:
+   - Kora: `https://your-domain.com/api/webhooks/kora`
+   - Paystack: `https://your-domain.com/api/webhooks/paystack`
+5. Click **Save Changes**. The Wallet page for all users immediately reflects the newly active gateway.
+
+> Secret keys are encrypted with AES-256-GCM before being stored (`ENCRYPTION_KEY` env var) and are never
+> sent back to the browser in plaintext — only a masked preview (e.g. `sk_t••••••••t123`) is shown so you
+> can confirm the right key is saved.
 
 ---
 
@@ -385,6 +431,38 @@ curl -X POST https://api.textflowpro.gh/v1/sms/send \
   "cost": 0.05,
   "currency": "GHS",
   "recipient": "+233241234567"
+}
+```
+
+### Wallet & Payments (internal dashboard API)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/wallet/balance` | Get the current user's wallet balance |
+| `GET` | `/api/wallet/transactions` | List the current user's transaction history |
+| `POST` | `/api/wallet/deposit` | Initialize a deposit with the **active** gateway, returns `paymentUrl` to redirect to |
+| `GET` | `/api/wallet/verify?reference=` | Actively re-check a payment's status with the gateway and credit the wallet if needed |
+| `POST` | `/api/webhooks/kora` | Kora Pay server-to-server webhook (HMAC-SHA256 verified) |
+| `POST` | `/api/webhooks/paystack` | Paystack server-to-server webhook (HMAC-SHA512 verified) |
+| `GET` | `/api/admin/settings` | *(Admin only)* Read platform settings incl. masked gateway key status |
+| `PUT` | `/api/admin/settings` | *(Admin only)* Update branding, pricing, and gateway configuration |
+
+```bash
+# Initialize a deposit (as a logged-in user)
+curl -X POST https://your-domain.com/api/wallet/deposit \
+  -H "Content-Type: application/json" --cookie "access_token=..." \
+  -d '{"amount": 50}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "paymentId": "b1c2...",
+  "reference": "DEP-1733999999999-4C90EA12",
+  "paymentUrl": "https://checkout.korapay.com/DEP-.../pay",
+  "amount": 50,
+  "gateway": "KORA"
 }
 ```
 

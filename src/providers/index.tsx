@@ -144,6 +144,9 @@ interface SettingsContextType {
     accentColor: string;
     whatsappSupport?: string;
     socialLinks: Record<string, string>;
+    activePaymentGateway?: 'KORA' | 'PAYSTACK';
+    koraConfigured?: boolean;
+    paystackConfigured?: boolean;
   } | null;
   refreshSettings: () => Promise<void>;
 }

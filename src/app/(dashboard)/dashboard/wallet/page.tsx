@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Clock, Check, Loader2, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Clock, Loader2, AlertCircle, ShieldCheck, ExternalLink } from 'lucide-react';
+import { useSettings } from '@/providers';
 
 interface Transaction {
   id: string;
@@ -15,25 +16,25 @@ interface Transaction {
   createdAt: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  name: string;
-  logo: string;
-  fee: number;
-}
-
-const paymentMethods: PaymentMethod[] = [
-  { id: 'MOMO', name: 'MTN MoMo', logo: '/momo.svg', fee: 0 },
-  { id: 'TELECEL_CASH', name: 'Telecel Cash', logo: '/telecel.svg', fee: 0 },
-  { id: 'BANK', name: 'Bank Transfer', logo: '/bank.svg', fee: 0 },
-];
+const GATEWAY_INFO: Record<string, { name: string; color: string; description: string }> = {
+  KORA: {
+    name: 'Kora Pay',
+    color: '#006B3F',
+    description: 'Pay securely with Mobile Money, Card, or Bank Transfer via Kora Pay.',
+  },
+  PAYSTACK: {
+    name: 'Paystack',
+    color: '#00C3F7',
+    description: 'Pay securely with Mobile Money, Card, or Bank Transfer via Paystack.',
+  },
+};
 
 export default function WalletPage() {
+  const { settings } = useSettings();
   const [balance, setBalance] = useState('0.00');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [depositAmount, setDepositAmount] = useState('');
-  const [selectedMethod, setSelectedMethod] = useState('MOMO');
   const [isDepositing, setIsDepositing] = useState(false);
   const [depositResult, setDepositResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
@@ -64,6 +65,10 @@ export default function WalletPage() {
     }
   };
 
+  const activeGateway = settings?.activePaymentGateway || 'KORA';
+  const gatewayInfo = GATEWAY_INFO[activeGateway];
+  const isGatewayConfigured = activeGateway === 'KORA' ? settings?.koraConfigured : settings?.paystackConfigured;
+
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount < 5) {
@@ -78,28 +83,26 @@ export default function WalletPage() {
       const res = await fetch('/api/wallet/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount,
-          method: selectedMethod,
-        }),
+        body: JSON.stringify({ amount }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
+        setDepositResult({ success: true, message: `Redirecting you to ${gatewayInfo.name}...` });
         window.location.href = data.paymentUrl;
       } else {
         setDepositResult({
           success: false,
           error: data.error || 'Failed to initialize payment',
         });
+        setIsDepositing(false);
       }
     } catch {
       setDepositResult({
         success: false,
         error: 'Network error. Please try again.',
       });
-    } finally {
       setIsDepositing(false);
     }
   };
@@ -190,21 +193,31 @@ export default function WalletPage() {
             <h2 className="font-semibold">Top Up Wallet</h2>
           </div>
 
-          {depositResult && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${
-              depositResult.success ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'
-            }`}>
-              {depositResult.success ? depositResult.message : depositResult.error}
-            </div>
-          )}
+          <AnimatePresence>
+            {depositResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  depositResult.success ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'
+                }`}
+              >
+                {depositResult.success ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" /> : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+                {depositResult.success ? depositResult.message : depositResult.error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Quick Amounts */}
           <div className="mb-4">
             <label className="text-sm font-medium mb-2 block">Quick Amount (GH₵)</label>
             <div className="grid grid-cols-3 gap-2">
               {quickAmounts.map((amt) => (
-                <button
+                <motion.button
                   key={amt}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setDepositAmount(amt.toString())}
                   className={`p-3 rounded-lg border text-center font-medium transition-colors ${
                     depositAmount === amt.toString()
@@ -213,7 +226,7 @@ export default function WalletPage() {
                   }`}
                 >
                   GH₵{amt}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -226,7 +239,7 @@ export default function WalletPage() {
               <input
                 type="number"
                 min="5"
-                max="10000"
+                max="50000"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 placeholder="Enter amount"
@@ -235,43 +248,46 @@ export default function WalletPage() {
             </div>
           </div>
 
-          {/* Payment Method */}
+          {/* Active Payment Gateway (admin-controlled) */}
           <div className="mb-6">
-            <label className="text-sm font-medium mb-2 block">Payment Method</label>
-            <div className="space-y-2">
-              {paymentMethods.map((method) => (
-                <label
-                  key={method.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedMethod === method.id
-                      ? 'border-green-600 bg-green-50'
-                      : 'hover:bg-accent'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="method"
-                    value={method.id}
-                    checked={selectedMethod === method.id}
-                    onChange={() => setSelectedMethod(method.id)}
-                    className="sr-only"
-                  />
-                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                    selectedMethod === method.id
-                      ? 'border-green-600'
-                      : 'border-muted'
-                  }`}>
-                    {selectedMethod === method.id && (
-                      <div className="h-2 w-2 rounded-full bg-green-600" />
-                    )}
-                  </div>
-                  <span className="font-medium">{method.name}</span>
-                </label>
-              ))}
+            <label className="text-sm font-medium mb-2 block">Payment Gateway</label>
+            <div
+              className="flex items-center gap-3 p-4 rounded-lg border-2"
+              style={{ borderColor: gatewayInfo.color, backgroundColor: `${gatewayInfo.color}0d` }}
+            >
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white font-bold flex-shrink-0"
+                style={{ backgroundColor: gatewayInfo.color }}
+              >
+                {gatewayInfo.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium flex items-center gap-2">
+                  {gatewayInfo.name}
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: gatewayInfo.color }}
+                  >
+                    Active
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{gatewayInfo.description}</p>
+              </div>
             </div>
+            {!isGatewayConfigured && (
+              <div className="mt-2 flex items-start gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  {gatewayInfo.name} has not been configured by the administrator yet. Deposits will fail until
+                  API keys are added in the Admin Panel.
+                </span>
+              </div>
+            )}
           </div>
 
-          <button
+          <motion.button
+            whileHover={{ scale: isDepositing ? 1 : 1.01 }}
+            whileTap={{ scale: isDepositing ? 1 : 0.98 }}
             onClick={handleDeposit}
             disabled={!depositAmount || isDepositing}
             className="btn w-full h-11 text-white"
@@ -284,11 +300,12 @@ export default function WalletPage() {
               </>
             ) : (
               <>
-                <CreditCard className="h-4 w-4" />
-                Deposit GH₵{depositAmount || '0'}
+                <ShieldCheck className="h-4 w-4" />
+                Pay GH₵{depositAmount || '0'} with {gatewayInfo.name}
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
               </>
             )}
-          </button>
+          </motion.button>
         </motion.div>
       </div>
 

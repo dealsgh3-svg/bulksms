@@ -17,6 +17,9 @@ export async function GET() {
         accentColor: '#06B6D4',
         whatsappSupport: null,
         socialLinks: {},
+        activePaymentGateway: 'KORA',
+        koraConfigured: false,
+        paystackConfigured: false,
       });
     }
 
@@ -33,6 +36,10 @@ export async function GET() {
       copyright: settings.copyright,
       termsUrl: settings.termsUrl,
       privacyUrl: settings.privacyUrl,
+      // Public payment info only - never expose secret/webhook keys here.
+      activePaymentGateway: settings.activePaymentGateway,
+      koraConfigured: Boolean(settings.koraSecretKey || process.env.KORA_SECRET_KEY),
+      paystackConfigured: Boolean(settings.paystackSecretKey || process.env.PAYSTACK_SECRET_KEY),
     });
   } catch (error) {
     console.error('Get settings error:', error);
