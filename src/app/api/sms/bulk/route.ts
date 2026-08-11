@@ -157,7 +157,7 @@ export async function POST(request: Request) {
     }
     if (error instanceof AgooApiError) {
       const status = error.status === 429 || error.status === 402 || error.status === 400 ? error.status : 502;
-      return NextResponse.json({ success: false, error: { code: error.code, message: error.message }, rateLimit: error.rateLimit }, { status });
+      return NextResponse.json({ success: false, error: error.message, errorCode: error.code, rateLimit: error.rateLimit }, { status });
     }
 
     return NextResponse.json({ success: false, error: 'Failed to send bulk SMS' }, { status: 500 });

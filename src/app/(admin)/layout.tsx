@@ -18,12 +18,14 @@ import {
   Menu,
   Loader2,
   AlertTriangle,
+  BadgeCheck,
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const adminNavigation = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
   { name: 'Users', href: '/admin/users', icon: Users },
+  { name: 'Sender IDs', href: '/admin/sender-ids', icon: BadgeCheck },
   { name: 'Transactions', href: '/admin/transactions', icon: Wallet },
   { name: 'SMS Logs', href: '/admin/sms', icon: Send },
   { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },

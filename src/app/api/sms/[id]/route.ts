@@ -33,7 +33,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: false, error: error.message }, { status: 503 });
     }
     if (error instanceof AgooApiError) {
-      return NextResponse.json({ success: false, error: { code: error.code, message: error.message }, rateLimit: error.rateLimit }, { status: error.status });
+      return NextResponse.json({ success: false, error: error.message, errorCode: error.code, rateLimit: error.rateLimit }, { status: error.status });
     }
 
     return NextResponse.json({ success: false, error: 'Failed to fetch message details' }, { status: 500 });

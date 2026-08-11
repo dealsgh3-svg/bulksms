@@ -20,6 +20,7 @@ export async function GET() {
         activePaymentGateway: 'KORA',
         koraConfigured: false,
         paystackConfigured: false,
+        pricingTiers: { USER: 0.05, AGENT: 0.04, DEVELOPER: 0.035 },
       });
     }
 
@@ -40,6 +41,8 @@ export async function GET() {
       activePaymentGateway: settings.activePaymentGateway,
       koraConfigured: Boolean(settings.koraSecretKey || process.env.KORA_SECRET_KEY),
       paystackConfigured: Boolean(settings.paystackSecretKey || process.env.PAYSTACK_SECRET_KEY),
+      // Per-role SMS pricing is not sensitive - users need it to preview costs before sending.
+      pricingTiers: settings.pricingTiers,
     });
   } catch (error) {
     console.error('Get settings error:', error);
