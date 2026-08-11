@@ -1,94 +1,77 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { db, schema } from '@/db';
-import { eq, and, inArray } from 'drizzle-orm';
-import { calculateSmsPages, calculateSmsCost, generateReference, formatPhoneNumber, chunk } from '@/lib/utils';
+import { and, eq } from 'drizzle-orm';
+import { calculateSmsPages, calculateSmsCost, formatPhoneNumber } from '@/lib/utils';
+import { creditWallet, debitWallet, InsufficientBalanceError } from '@/lib/services/wallet';
+import { getSettings, getSmsRateForRole } from '@/lib/services/settings';
+import {
+  AgooApiError,
+  AgooConfigurationError,
+  getAgooRuntimeConfig,
+  mapAgooStatusToInternal,
+  sendBulkSmsWithAgoo,
+} from '@/lib/services/agoo-sms';
+
+function getDefaultSenderId(settings?: Record<string, unknown>) {
+  return String(settings?.testSenderId || process.env.SMS_GATEWAY_USER_SENDER_ID || 'SMS_GATEWAY_USER_SENDER_ID');
+}
 
 export async function POST(request: Request) {
   try {
     const authResult = await getCurrentUser();
-    
+
     if (!authResult.success || !authResult.user) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      );
+      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
 
     const body = await request.json();
     const { recipients, message, senderId, scheduleAt } = body;
 
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Recipients are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: 'Recipients are required' }, { status: 400 });
     }
 
-    if (!message) {
-      return NextResponse.json(
-        { success: false, error: 'Message is required' },
-        { status: 400 }
-      );
+    if (recipients.length > 1000) {
+      return NextResponse.json({ success: false, error: 'Agoo SMS bulk requests support up to 1,000 recipients' }, { status: 400 });
     }
 
-    // Format phone numbers
-    const formattedRecipients = recipients.map(formatPhoneNumber);
-    const uniqueRecipients = [...new Set(formattedRecipients)];
-
-    // Get user wallet
-    const wallet = await db.query.wallets.findFirst({
-      where: eq(schema.wallets.userId, authResult.user.id),
-    });
-
-    if (!wallet) {
-      return NextResponse.json(
-        { success: false, error: 'Wallet not found' },
-        { status: 400 }
-      );
+    if (!message || typeof message !== 'string') {
+      return NextResponse.json({ success: false, error: 'Message is required' }, { status: 400 });
     }
 
-    // Calculate cost
-    const { pages } = calculateSmsPages(message);
-    const pricingTiers = {
-      USER: 0.02,
-      AGENT: 0.015,
-      DEVELOPER: 0.012,
-      ADMIN: 0.01,
-    };
-    const rate = pricingTiers[authResult.user.role] || 0.02;
-    const costPerSms = calculateSmsCost(pages, rate);
-    const totalCost = costPerSms * uniqueRecipients.length;
-
-    // Check balance
-    const balance = parseFloat(wallet.balance);
-    if (balance < totalCost) {
-      return NextResponse.json(
-        { success: false, error: `Insufficient balance. Required: $${totalCost.toFixed(3)}, Available: $${balance.toFixed(3)}` },
-        { status: 400 }
-      );
+    if (message.length > 480) {
+      return NextResponse.json({ success: false, error: 'Agoo SMS messages are limited to 480 characters / 3 segments' }, { status: 400 });
     }
 
-    // Get user's default sender ID if not specified
-    let finalSenderId = senderId;
+    const formattedRecipients = [...new Set(recipients.map((recipient) => formatPhoneNumber(String(recipient))))];
+    const agooConfig = await getAgooRuntimeConfig();
+
+    let finalSenderId = typeof senderId === 'string' && senderId.trim() ? senderId.trim() : '';
     if (!finalSenderId) {
       const defaultSender = await db.query.senderIds.findFirst({
-        where: and(
-          eq(schema.senderIds.userId, authResult.user.id),
-          eq(schema.senderIds.isDefault, true),
-          eq(schema.senderIds.status, 'APPROVED')
-        ),
+        where: and(eq(schema.senderIds.userId, authResult.user.id), eq(schema.senderIds.isDefault, true), eq(schema.senderIds.status, 'APPROVED')),
       });
-      finalSenderId = defaultSender?.senderId || 'TextFlow';
+      finalSenderId = defaultSender?.senderId || getDefaultSenderId(agooConfig.settings);
     }
 
-    // If scheduled, create scheduled SMS record
+    let upstreamMessage = message;
+    if (agooConfig.keyType === 'test' && finalSenderId === getDefaultSenderId(agooConfig.settings)) {
+      upstreamMessage = 'Hello from Agoo';
+    }
+
+    const { pages } = calculateSmsPages(upstreamMessage);
+    const platformSettings = await getSettings();
+    const rate = getSmsRateForRole(platformSettings.pricingTiers, authResult.user.role);
+    const costPerSms = agooConfig.keyType === 'test' ? 0 : calculateSmsCost(pages, rate);
+    const totalCost = costPerSms * formattedRecipients.length;
+
     if (scheduleAt) {
       const [scheduled] = await db.insert(schema.scheduledSms).values({
         userId: authResult.user.id,
         senderId: finalSenderId,
-        recipients: uniqueRecipients,
-        message,
+        recipients: formattedRecipients,
+        message: upstreamMessage,
         pages,
         totalCost: totalCost.toString(),
         scheduledFor: new Date(scheduleAt),
@@ -98,59 +81,85 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         scheduledId: scheduled.id,
-        count: uniqueRecipients.length,
+        count: formattedRecipients.length,
         totalCost,
         scheduledFor: scheduleAt,
       });
     }
 
-    const userId = authResult.user.id;
-    
-    // Create SMS logs for each recipient
-    const smsLogs = await db.insert(schema.smsLogs)
-      .values(
-        uniqueRecipients.map((recipient) => ({
-          userId,
+    const walletResult = totalCost > 0
+      ? await debitWallet({
+          userId: authResult.user.id,
+          amount: totalCost,
+          reason: 'SMS_PURCHASE',
+          description: `Bulk SMS to ${formattedRecipients.length} recipients`,
+          reference: `BULK-SMS-${Date.now()}-${authResult.user.id.slice(0, 8).toUpperCase()}`,
+          metadata: { channel: 'BULK', recipientCount: formattedRecipients.length },
+        })
+      : null;
+
+    try {
+      const { response, rateLimit } = await sendBulkSmsWithAgoo({
+        recipients: formattedRecipients,
+        message: upstreamMessage,
+        senderId: finalSenderId,
+      });
+
+      const upstream = response.data!;
+      const status = mapAgooStatusToInternal(upstream.status);
+      const logs = await db.insert(schema.smsLogs).values(
+        formattedRecipients.map((recipient) => ({
+          userId: authResult.user!.id,
           senderId: finalSenderId,
           recipient,
-          message,
-          pages,
+          message: upstreamMessage,
+          pages: upstream.segments || pages,
           cost: costPerSms.toString(),
-          status: 'QUEUED' as const,
+          status,
           provider: 'BULK' as const,
-          externalId: `MSG-${Date.now()}-${recipient}`,
+          externalId: upstream.messageId,
         }))
-      )
-      .returning();
+      ).returning();
 
-    // Deduct from wallet
-    const newBalance = balance - totalCost;
-    await db.update(schema.wallets)
-      .set({ balance: newBalance.toString(), updatedAt: new Date() })
-      .where(eq(schema.wallets.id, wallet.id));
-
-    // Create transaction record
-    await db.insert(schema.transactions).values({
-      walletId: wallet.id,
-      type: 'DEBIT',
-      amount: totalCost.toString(),
-      balanceAfter: newBalance.toString(),
-      reason: 'SMS_PURCHASE',
-      description: `Bulk SMS to ${uniqueRecipients.length} recipients`,
-      reference: generateReference(),
-    });
-
-    return NextResponse.json({
-      success: true,
-      count: uniqueRecipients.length,
-      totalCost,
-      messageIds: smsLogs.map((log) => log.id),
-    });
+      return NextResponse.json({
+        success: true,
+        count: formattedRecipients.length,
+        totalCost,
+        costPerSms,
+        upstreamMessageId: upstream.messageId,
+        upstreamCost: upstream.totalCost ?? 0,
+        upstreamBalance: upstream.balance,
+        status: upstream.status,
+        messageIds: logs.map((log) => log.id),
+        rateLimit,
+      });
+    } catch (error) {
+      if (walletResult && totalCost > 0) {
+        await creditWallet({
+          userId: authResult.user.id,
+          amount: totalCost,
+          reason: 'REFUND',
+          description: `Refund for failed bulk SMS to ${formattedRecipients.length} recipients`,
+          reference: `REFUND-${walletResult.transaction.reference}`,
+          metadata: { originalTransaction: walletResult.transaction.reference, channel: 'BULK' },
+        }).catch((refundError) => console.error('Bulk SMS refund failed:', refundError));
+      }
+      throw error;
+    }
   } catch (error) {
     console.error('Bulk SMS error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to send bulk SMS' },
-      { status: 500 }
-    );
+
+    if (error instanceof InsufficientBalanceError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+    }
+    if (error instanceof AgooConfigurationError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 503 });
+    }
+    if (error instanceof AgooApiError) {
+      const status = error.status === 429 || error.status === 402 || error.status === 400 ? error.status : 502;
+      return NextResponse.json({ success: false, error: { code: error.code, message: error.message }, rateLimit: error.rateLimit }, { status });
+    }
+
+    return NextResponse.json({ success: false, error: 'Failed to send bulk SMS' }, { status: 500 });
   }
 }

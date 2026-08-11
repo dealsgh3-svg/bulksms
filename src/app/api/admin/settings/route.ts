@@ -8,16 +8,13 @@ import { updateSettingsSchema } from '@/lib/validators/payment';
 import { z } from 'zod';
 
 // Extended schema for the admin settings form, including gateway keys.
-// All key fields can be null (DB stores NULL when empty) or empty string.
-const optionalKeyStr = z.string().optional().nullable().transform((v) => v ?? undefined);
-
 const adminSettingsSchema = updateSettingsSchema.extend({
-  koraPublicKey: optionalKeyStr,
-  koraSecretKey: optionalKeyStr,
-  koraWebhookSecret: optionalKeyStr,
-  paystackPublicKey: optionalKeyStr,
-  paystackSecretKey: optionalKeyStr,
-  paystackWebhookSecret: optionalKeyStr,
+  koraPublicKey: z.string().optional(),
+  koraSecretKey: z.string().optional(),
+  koraWebhookSecret: z.string().optional(),
+  paystackPublicKey: z.string().optional(),
+  paystackSecretKey: z.string().optional(),
+  paystackWebhookSecret: z.string().optional(),
 });
 
 export async function GET() {
@@ -31,19 +28,19 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     settings: {
-      siteName: settings.siteName,
-      tagline: settings.tagline,
-      logoUrl: settings.logoUrl,
-      faviconUrl: settings.faviconUrl,
-      primaryColor: settings.primaryColor,
-      secondaryColor: settings.secondaryColor,
-      accentColor: settings.accentColor,
-      whatsappSupport: settings.whatsappSupport,
-      socialLinks: settings.socialLinks,
-      footerContent: settings.footerContent,
-      copyright: settings.copyright,
-      termsUrl: settings.termsUrl,
-      privacyUrl: settings.privacyUrl,
+      siteName: settings.siteName || '',
+      tagline: settings.tagline || '',
+      logoUrl: settings.logoUrl || '',
+      faviconUrl: settings.faviconUrl || '',
+      primaryColor: settings.primaryColor || '#006B3F',
+      secondaryColor: settings.secondaryColor || '#FCD116',
+      accentColor: settings.accentColor || '#CE1126',
+      whatsappSupport: settings.whatsappSupport || '',
+      socialLinks: settings.socialLinks || {},
+      footerContent: settings.footerContent || '',
+      copyright: settings.copyright || '',
+      termsUrl: settings.termsUrl || '',
+      privacyUrl: settings.privacyUrl || '',
       activePaymentGateway: settings.activePaymentGateway,
       pricingTiers: settings.pricingTiers,
       // Never send raw secrets to the client - only whether they're set + a masked preview.
@@ -69,7 +66,15 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const result = adminSettingsSchema.safeParse(body);
+    // Optional settings columns are nullable in PostgreSQL. Normalize nulls
+    // from the admin form/API response before Zod validates string fields.
+    const normalizedBody = Object.fromEntries(
+      Object.entries(body as Record<string, unknown>).map(([key, value]) => [
+        key,
+        value === null ? undefined : value,
+      ])
+    );
+    const result = adminSettingsSchema.safeParse(normalizedBody);
 
     if (!result.success) {
       const firstError = result.error.issues[0];

@@ -19,32 +19,26 @@ export const updateUserSchema = z.object({
   whatsappVerified: z.boolean().optional(),
 });
 
-// Many settings columns are nullable in the DB, so the admin form may send
-// null values back. We coerce nulls to undefined so downstream code works
-// the same for both "not sent" and "sent as null".
-const nullableStr = z.string().optional().nullable().transform((v) => v ?? undefined);
-const nullableUrl = z.string().url().or(z.literal('')).optional().nullable().transform((v) => v ?? undefined);
-
 export const updateSettingsSchema = z.object({
   siteName: z.string().min(1).optional(),
-  tagline: nullableStr,
-  logoUrl: nullableUrl,
-  faviconUrl: nullableUrl,
+  tagline: z.string().optional(),
+  logoUrl: z.string().url().optional().or(z.literal('')),
+  faviconUrl: z.string().url().optional().or(z.literal('')),
   primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  whatsappSupport: nullableStr,
+  whatsappSupport: z.string().optional(),
   socialLinks: z.object({
-    facebook: nullableUrl,
-    twitter: nullableUrl,
-    instagram: nullableUrl,
-    linkedin: nullableUrl,
-    youtube: nullableUrl,
-  }).optional().nullable(),
-  footerContent: nullableStr,
-  copyright: nullableStr,
-  termsUrl: nullableUrl,
-  privacyUrl: nullableUrl,
+    facebook: z.string().url().optional().or(z.literal('')),
+    twitter: z.string().url().optional().or(z.literal('')),
+    instagram: z.string().url().optional().or(z.literal('')),
+    linkedin: z.string().url().optional().or(z.literal('')),
+    youtube: z.string().url().optional().or(z.literal('')),
+  }).optional(),
+  footerContent: z.string().optional(),
+  copyright: z.string().optional(),
+  termsUrl: z.string().url().optional().or(z.literal('')),
+  privacyUrl: z.string().url().optional().or(z.literal('')),
   activePaymentGateway: z.enum(['KORA', 'PAYSTACK']).optional(),
   pricingTiers: z.object({
     USER: z.number().optional(),

@@ -34,6 +34,13 @@ export async function getSettings(): Promise<PlatformSettings> {
  * ready to use for calling upstream payment APIs. Never expose this
  * directly to the client.
  */
+export function getSmsRateForRole(pricingTiers: unknown, role: string): number {
+  const defaults: Record<string, number> = { USER: 0.05, AGENT: 0.04, DEVELOPER: 0.035, ADMIN: 0.035 };
+  const tiers = (pricingTiers && typeof pricingTiers === 'object' ? pricingTiers : {}) as Record<string, unknown>;
+  const configured = Number(tiers[role]);
+  return Number.isFinite(configured) && configured > 0 ? configured : defaults[role] || defaults.USER;
+}
+
 export async function getDecryptedSettings(): Promise<PlatformSettings & {
   koraSecretKeyDecrypted: string;
   koraWebhookSecretDecrypted: string;

@@ -143,6 +143,45 @@ All SMS APIs expect E.164 format (`+233XXXXXXXXX`).
 
 ---
 
+## 📡 Agoo SMS Upstream Provider
+
+Agoo SMS is the primary upstream SMS engine. Admins configure it from `/admin/providers`, and the
+configuration is persisted to PostgreSQL in the `sms_providers` table with the API key encrypted at rest.
+
+### Admin Provider Controls
+
+- **API Key**: accepts only `agoo_test_...` or `agoo_live_...` keys.
+- **Provider Status**: disables/enables all upstream Agoo sends.
+- **Base URL**: defaults to `https://api.agoosms.com`.
+- **Platform Test Sender ID**: defaults to `SMS_GATEWAY_USER_SENDER_ID`.
+- **Check Balance**: calls `GET https://api.agoosms.com/v1/balance` with `X-API-Key`.
+
+### Exact Endpoint Mapping
+
+| Platform action | Agoo endpoint | Request body / auth |
+|---|---|---|
+| Single SMS | `POST /v1/sms/send` | `X-API-Key`, `{ to, message, senderId }` |
+| Bulk SMS | `POST /v1/sms/send-bulk` | `X-API-Key`, `{ recipients, message, senderId }` |
+| Message details | `GET /v1/sms/:id` | `X-API-Key` |
+| Message status | `GET /v1/sms/:id/status` | `X-API-Key` |
+| Balance | `GET /v1/balance` | `X-API-Key` |
+
+### Agoo Rules Enforced by the Platform
+
+- Single SMS and bulk SMS require a `senderId`.
+- Messages are limited to **480 characters / 3 segments**.
+- Bulk sends are limited to **1,000 recipients**.
+- `agoo_test_` keys simulate delivery and create **GH₵0.00** platform charges.
+- If a test key uses the configured platform test sender ID, the platform sends the exact test body
+  `Hello from Agoo`, as required by Agoo.
+- Agoo status values are mapped into internal `sms_logs.status` values.
+- Agoo errors are returned with their documented `{ success: false, error: { code, message } }` shape,
+  including `RATE_LIMIT_EXCEEDED`, `INSUFFICIENT_BALANCE`, and `SENDER_ID_NOT_APPROVED`.
+- Rate-limit headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`) are parsed and
+  returned by platform endpoints for debugging.
+
+---
+
 ## 💳 Payment Gateways (Kora Pay & Paystack)
 
 Wallet top-ups are processed through **real payment gateway integrations** — Kora Pay (default) and
@@ -251,10 +290,19 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=your-secret-key
 JWT_REFRESH_SECRET=your-refresh-secret
 
-# Ghana Payment Config
-PAYMENT_PROVIDER=momo
-MOMO_API_KEY=your-momo-api-key
-MOMO_API_SECRET=your-momo-secret
+# Encryption for saved admin secrets
+ENCRYPTION_KEY=replace-with-a-long-random-production-secret
+
+# Agoo SMS (normally saved from Admin Panel → Providers)
+AGOO_API_KEY=agoo_test_your-agoo-test-or-live-key
+SMS_GATEWAY_USER_SENDER_ID=SMS_GATEWAY_USER_SENDER_ID
+
+# Payment gateways can be set from Admin Panel → Settings → Payment Gateways
+# Optional environment fallback values:
+KORA_SECRET_KEY=sk_live_your-kora-secret-key
+KORA_PUBLIC_KEY=pk_live_your-kora-public-key
+PAYSTACK_SECRET_KEY=sk_live_your-paystack-secret-key
+PAYSTACK_PUBLIC_KEY=pk_live_your-paystack-public-key
 ```
 
 ---
@@ -267,7 +315,7 @@ The database ships with two pre-seeded accounts. Run the seed script to create t
 npx tsx scripts/seed.ts
 ```
 
-Then log in with either account (there are also quick-fill buttons on the login page):
+Then log in with either account from the standard sign-in form:
 
 | Account | Email | Password | Access |
 |---------|-------|----------|--------|
@@ -312,6 +360,19 @@ The interface uses Framer Motion throughout for a lively feel:
 - Sliding active-nav indicator in the sidebar
 - Floating decorative shapes on auth pages
 - Staggered reveal animations on lists and grids
+- Light/dark mode toggle persisted with `next-themes`
+
+### Live Dashboard Data
+
+Dashboard and analytics cards are calculated from PostgreSQL at request time — there are no seeded
+sample metrics, fabricated charts, or fake recent messages in the UI. Empty accounts show clear empty
+states until they have actual SMS, contact, payment, or user records.
+
+- User data: `GET /api/dashboard/summary?days=7|30|90`
+- Admin data: `GET /api/admin/analytics`
+- Revenue is calculated from completed payment records.
+- SMS delivery metrics are calculated from `sms_logs`.
+- Admin profit displays `—` until provider-cost accounting is configured instead of presenting an invented margin.
 
 ---
 
