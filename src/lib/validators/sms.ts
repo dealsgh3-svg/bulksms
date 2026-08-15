@@ -1,13 +1,19 @@
 import { z } from 'zod';
 
+// Accepts both E.164 (+233XXXXXXXXX) and local Ghana format (0XXXXXXXXX),
+// since numbers are normalized to E.164 server-side via formatPhoneNumber()
+// after validation. Rejecting local format here was a bug that blocked the
+// most common way Ghanaian users type phone numbers.
+const phoneRegex = /^(\+?\d{7,15}|0\d{6,14})$/;
+
 export const sendSmsSchema = z.object({
-  recipient: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number'),
+  recipient: z.string().regex(phoneRegex, 'Invalid phone number'),
   message: z.string().min(1, 'Message cannot be empty').max(10 * 160, 'Message too long'),
   senderId: z.string().min(3).max(11).optional(),
 });
 
 export const bulkSmsSchema = z.object({
-  recipients: z.array(z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number')).min(1),
+  recipients: z.array(z.string().regex(phoneRegex, 'Invalid phone number')).min(1),
   message: z.string().min(1, 'Message cannot be empty').max(10 * 160, 'Message too long'),
   senderId: z.string().min(3).max(11).optional(),
   deduplicate: z.boolean().default(false),
@@ -15,7 +21,7 @@ export const bulkSmsSchema = z.object({
 });
 
 export const scheduleSmsSchema = z.object({
-  recipients: z.array(z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number')).min(1),
+  recipients: z.array(z.string().regex(phoneRegex, 'Invalid phone number')).min(1),
   message: z.string().min(1).max(10 * 160),
   senderId: z.string().min(3).max(11).optional(),
   scheduledFor: z.string().datetime(),
@@ -29,7 +35,7 @@ export const senderIdRequestSchema = z.object({
 });
 
 export const contactSchema = z.object({
-  phone: z.string().regex(/^\+?[1-9]\d{6,14}$/, 'Invalid phone number'),
+  phone: z.string().regex(phoneRegex, 'Invalid phone number'),
   name: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   tags: z.array(z.string()).optional().default([]),
@@ -44,6 +50,7 @@ export const contactImportSchema = z.object({
     tags: z.array(z.string()).optional(),
   })).min(1),
   groupId: z.string().uuid().optional(),
+  groupName: z.string().min(1).max(100).optional(),
 });
 
 export const groupSchema = z.object({

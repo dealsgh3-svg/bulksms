@@ -46,9 +46,9 @@ export function maskApiKey(key: string): string {
   return `${key.slice(0, 12)}${'•'.repeat(32)}${key.slice(-4)}`;
 }
 
-export function formatCurrency(amount: number | string, currency: string = 'USD'): string {
+export function formatCurrency(amount: number | string, currency: string = 'GHS'): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-GH', {
     style: 'currency',
     currency,
   }).format(num);
@@ -60,9 +60,9 @@ export function formatNumber(num: number): string {
 
 export function formatPhoneNumber(phone: string): string {
   const cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('234')) return `+${cleaned}`;
-  if (cleaned.startsWith('0')) return `+234${cleaned.slice(1)}`;
-  if (!cleaned.startsWith('+')) return `+${cleaned}`;
+  if (cleaned.startsWith('233')) return `+${cleaned}`;
+  if (cleaned.startsWith('0')) return `+233${cleaned.slice(1)}`;
+  if (!cleaned.startsWith('+')) return `+233${cleaned}`;
   return cleaned;
 }
 

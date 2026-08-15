@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Clock, Check, Loader2, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Wallet, CreditCard, ArrowUpRight, ArrowDownRight, Clock, Loader2, AlertCircle, ShieldCheck, ExternalLink } from 'lucide-react';
+import { useSettings } from '@/providers';
 
 interface Transaction {
   id: string;
@@ -15,24 +16,25 @@ interface Transaction {
   createdAt: string;
 }
 
-interface PaymentMethod {
-  id: string;
-  name: string;
-  logo: string;
-  fee: number;
-}
-
-const paymentMethods: PaymentMethod[] = [
-  { id: 'KORA', name: 'Kora Pay', logo: '/kora.svg', fee: 0 },
-  { id: 'PAYSTACK', name: 'Paystack', logo: '/paystack.svg', fee: 0 },
-];
+const GATEWAY_INFO: Record<string, { name: string; color: string; description: string }> = {
+  KORA: {
+    name: 'Kora Pay',
+    color: '#006B3F',
+    description: 'Pay securely with Mobile Money, Card, or Bank Transfer via Kora Pay.',
+  },
+  PAYSTACK: {
+    name: 'Paystack',
+    color: '#00C3F7',
+    description: 'Pay securely with Mobile Money, Card, or Bank Transfer via Paystack.',
+  },
+};
 
 export default function WalletPage() {
+  const { settings } = useSettings();
   const [balance, setBalance] = useState('0.00');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [depositAmount, setDepositAmount] = useState('');
-  const [selectedGateway, setSelectedGateway] = useState('KORA');
   const [isDepositing, setIsDepositing] = useState(false);
   const [depositResult, setDepositResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
 
@@ -63,10 +65,14 @@ export default function WalletPage() {
     }
   };
 
+  const activeGateway = settings?.activePaymentGateway || 'KORA';
+  const gatewayInfo = GATEWAY_INFO[activeGateway];
+  const isGatewayConfigured = activeGateway === 'KORA' ? settings?.koraConfigured : settings?.paystackConfigured;
+
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
-    if (isNaN(amount) || amount < 1) {
-      setDepositResult({ success: false, error: 'Minimum deposit is $1' });
+    if (isNaN(amount) || amount < 5) {
+      setDepositResult({ success: false, error: 'Minimum deposit is GH₵5' });
       return;
     }
 
@@ -77,38 +83,35 @@ export default function WalletPage() {
       const res = await fetch('/api/wallet/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount,
-          gateway: selectedGateway,
-        }),
+        body: JSON.stringify({ amount }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Redirect to payment page
+        setDepositResult({ success: true, message: `Redirecting you to ${gatewayInfo.name}...` });
         window.location.href = data.paymentUrl;
       } else {
         setDepositResult({
           success: false,
           error: data.error || 'Failed to initialize payment',
         });
+        setIsDepositing(false);
       }
     } catch {
       setDepositResult({
         success: false,
         error: 'Network error. Please try again.',
       });
-    } finally {
       setIsDepositing(false);
     }
   };
 
-  const quickAmounts = [10, 25, 50, 100, 250, 500];
+  const quickAmounts = [10, 20, 50, 100, 200, 500];
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-GH', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -118,7 +121,7 @@ export default function WalletPage() {
   };
 
   const reasonLabels: Record<string, string> = {
-    DEPOSIT: 'Wallet Deposit',
+    DEPOSIT: 'Wallet Top-up',
     SMS_PURCHASE: 'SMS Purchase',
     REFUND: 'Refund',
     ADMIN_CREDIT: 'Admin Credit',
@@ -150,27 +153,28 @@ export default function WalletPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl bg-gradient-to-br from-primary to-secondary p-6 text-primary-foreground"
+          className="rounded-2xl p-6 text-white"
+          style={{ background: 'linear-gradient(135deg, #006B3F 0%, #004d2e 100%)' }}
         >
           <div className="flex items-center gap-3 mb-6">
             <Wallet className="h-8 w-8" />
             <div>
               <div className="text-sm opacity-80">Available Balance</div>
-              <div className="text-4xl font-bold">${parseFloat(balance).toFixed(2)}</div>
+              <div className="text-4xl font-bold">GH₵{parseFloat(balance).toFixed(2)}</div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">{transactions.filter(t => t.type === 'DEBIT').length}</div>
               <div className="text-xs opacity-80">SMS Sent</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">{transactions.filter(t => t.type === 'CREDIT').length}</div>
-              <div className="text-xs opacity-80">Deposits</div>
+              <div className="text-xs opacity-80">Top-ups</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div className="p-3 rounded-lg bg-white/10">
               <div className="text-2xl font-bold">
-                ${transactions.filter(t => t.type === 'CREDIT').reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(2)}
+                GH₵{transactions.filter(t => t.type === 'DEBIT').reduce((sum, t) => sum + parseFloat(t.amount), 0).toFixed(2)}
               </div>
               <div className="text-xs opacity-80">Total Spent</div>
             </div>
@@ -185,34 +189,44 @@ export default function WalletPage() {
           className="rounded-xl border bg-card p-6"
         >
           <div className="flex items-center gap-2 mb-6">
-            <CreditCard className="h-5 w-5 text-primary" />
+            <CreditCard className="h-5 w-5" style={{ color: '#006B3F' }} />
             <h2 className="font-semibold">Top Up Wallet</h2>
           </div>
 
-          {depositResult && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${
-              depositResult.success ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'
-            }`}>
-              {depositResult.success ? depositResult.message : depositResult.error}
-            </div>
-          )}
+          <AnimatePresence>
+            {depositResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className={`mb-4 p-3 rounded-lg text-sm flex items-center gap-2 ${
+                  depositResult.success ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'
+                }`}
+              >
+                {depositResult.success ? <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" /> : <AlertCircle className="h-4 w-4 flex-shrink-0" />}
+                {depositResult.success ? depositResult.message : depositResult.error}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Quick Amounts */}
           <div className="mb-4">
-            <label className="text-sm font-medium mb-2 block">Quick Amount</label>
+            <label className="text-sm font-medium mb-2 block">Quick Amount (GH₵)</label>
             <div className="grid grid-cols-3 gap-2">
               {quickAmounts.map((amt) => (
-                <button
+                <motion.button
                   key={amt}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   onClick={() => setDepositAmount(amt.toString())}
                   className={`p-3 rounded-lg border text-center font-medium transition-colors ${
                     depositAmount === amt.toString()
-                      ? 'border-primary bg-primary/10 text-primary'
+                      ? 'border-green-600 bg-green-50 text-green-700'
                       : 'border-input hover:bg-accent'
                   }`}
                 >
-                  ${amt}
-                </button>
+                  GH₵{amt}
+                </motion.button>
               ))}
             </div>
           </div>
@@ -221,58 +235,63 @@ export default function WalletPage() {
           <div className="mb-4">
             <label className="text-sm font-medium mb-2 block">Custom Amount</label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">GH₵</span>
               <input
                 type="number"
-                min="1"
-                max="10000"
+                min="5"
+                max="50000"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 placeholder="Enter amount"
-                className="input w-full pl-8"
+                className="input w-full pl-12"
               />
             </div>
           </div>
 
-          {/* Payment Gateway */}
+          {/* Active Payment Gateway (admin-controlled) */}
           <div className="mb-6">
-            <label className="text-sm font-medium mb-2 block">Payment Method</label>
-            <div className="space-y-2">
-              {paymentMethods.map((method) => (
-                <label
-                  key={method.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedGateway === method.id ? 'border-primary bg-primary/5' : 'hover:bg-accent'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="gateway"
-                    value={method.id}
-                    checked={selectedGateway === method.id}
-                    onChange={() => setSelectedGateway(method.id)}
-                    className="sr-only"
-                  />
-                  <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                    selectedGateway === method.id ? 'border-primary' : 'border-muted'
-                  }`}>
-                    {selectedGateway === method.id && (
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                    )}
-                  </div>
-                  <span className="font-medium">{method.name}</span>
-                  {method.fee > 0 && (
-                    <span className="text-xs text-muted-foreground">({method.fee}% fee)</span>
-                  )}
-                </label>
-              ))}
+            <label className="text-sm font-medium mb-2 block">Payment Gateway</label>
+            <div
+              className="flex items-center gap-3 p-4 rounded-lg border-2"
+              style={{ borderColor: gatewayInfo.color, backgroundColor: `${gatewayInfo.color}0d` }}
+            >
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white font-bold flex-shrink-0"
+                style={{ backgroundColor: gatewayInfo.color }}
+              >
+                {gatewayInfo.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium flex items-center gap-2">
+                  {gatewayInfo.name}
+                  <span
+                    className="text-xs px-2 py-0.5 rounded-full text-white"
+                    style={{ backgroundColor: gatewayInfo.color }}
+                  >
+                    Active
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{gatewayInfo.description}</p>
+              </div>
             </div>
+            {!isGatewayConfigured && (
+              <div className="mt-2 flex items-start gap-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  {gatewayInfo.name} has not been configured by the administrator yet. Deposits will fail until
+                  API keys are added in the Admin Panel.
+                </span>
+              </div>
+            )}
           </div>
 
-          <button
+          <motion.button
+            whileHover={{ scale: isDepositing ? 1 : 1.01 }}
+            whileTap={{ scale: isDepositing ? 1 : 0.98 }}
             onClick={handleDeposit}
             disabled={!depositAmount || isDepositing}
-            className="btn btn-primary w-full h-11"
+            className="btn w-full h-11 text-white"
+            style={{ backgroundColor: '#006B3F' }}
           >
             {isDepositing ? (
               <>
@@ -281,11 +300,12 @@ export default function WalletPage() {
               </>
             ) : (
               <>
-                <CreditCard className="h-4 w-4" />
-                Deposit ${depositAmount || '0'}
+                <ShieldCheck className="h-4 w-4" />
+                Pay GH₵{depositAmount || '0'} with {gatewayInfo.name}
+                <ExternalLink className="h-3.5 w-3.5 opacity-70" />
               </>
             )}
-          </button>
+          </motion.button>
         </motion.div>
       </div>
 
@@ -330,10 +350,10 @@ export default function WalletPage() {
                   <div className={`font-semibold ${
                     tx.type === 'CREDIT' ? 'text-green-600' : 'text-red-600'
                   }`}>
-                    {tx.type === 'CREDIT' ? '+' : '-'}${parseFloat(tx.amount).toFixed(2)}
+                    {tx.type === 'CREDIT' ? '+' : '-'}GH₵{parseFloat(tx.amount).toFixed(2)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Bal: ${parseFloat(tx.balanceAfter).toFixed(2)}
+                    Bal: GH₵{parseFloat(tx.balanceAfter).toFixed(2)}
                   </div>
                 </div>
               </div>
